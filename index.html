@@ -1,1094 +1,213 @@
-import React, { useState, useEffect } from 'react';
-import * as XLSX from 'xlsx';
-import { Users, Vote, FileUp, BarChart3, UserCheck, Settings, Trophy, Crown, Link, Plus, LogIn, Home } from 'lucide-react';
-
-const ElectionRoomSystem = () => {
-  // 전체 시스템 상태
-  const [currentView, setCurrentView] = useState('main');
-  const [electionRooms, setElectionRooms] = useState({});
-  const [currentRoomCode, setCurrentRoomCode] = useState('');
-  const [joinCode, setJoinCode] = useState('');
-
-  // 빠른 접속 텍스트 생성
-  const generateQuickAccessText = (roomCode) => {
-    return `📊 온라인 투표 참여하기
-    
-선거 코드: ${roomCode}
-
-1️⃣ 이 메시지를 복사하세요
-2️⃣ 새 브라우저/탭에서 시스템 접속
-3️⃣ "선거방 입장하기"에서 코드 입력: ${roomCode}
-4️⃣ 본인 인증 후 투표 완료!
-
-⚡ 빠른 접속: 메인 화면에서 "${roomCode}" 입력`;
-  };
-
-  // 빠른 접속 텍스트 복사
-  const copyQuickAccessText = (roomCode) => {
-    const text = generateQuickAccessText(roomCode);
-    
-    try {
-      navigator.clipboard.writeText(text).then(() => {
-        alert('✅ 학생 안내 메시지가 복사되었습니다!\n\n학생들에게 이 메시지를 공유하세요.');
-      }).catch(() => {
-        const textArea = document.createElement('textarea');
-        textArea.value = text;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-        alert('✅ 학생 안내 메시지가 복사되었습니다!\n\n학생들에게 이 메시지를 공유하세요.');
-      });
-    } catch (error) {
-      alert('📋 학생 안내 메시지:\n\n' + text);
-    }
-  };
-
-  // 선거방 생성 함수
-  const createElectionRoom = () => {
-    const generateCode = () => {
-      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-      let code = '';
-      for (let i = 0; i < 6; i++) {
-        code += chars.charAt(Math.floor(Math.random() * chars.length));
-      }
-      return code;
-    };
-
-    const newCode = generateCode();
-    const newRoom = {
-      code: newCode,
-      createdAt: new Date().toISOString(),
-      students: [],
-      candidates: { president: [], vicePresident: [] },
-      votes: [],
-      votedStudents: new Set(),
-      electionStarted: false
-    };
-
-    setElectionRooms(prev => ({
-      ...prev,
-      [newCode]: newRoom
-    }));
-
-    setCurrentRoomCode(newCode);
-    setCurrentView('room');
-    
-    alert(`새로운 선거방이 생성되었습니다!\n선거 코드: ${newCode}`);
-  };
-
-  // 선거방 입장 함수
-  const joinElectionRoom = (code) => {
-    if (electionRooms[code]) {
-      setCurrentRoomCode(code);
-      setCurrentView('vote');
-      return true;
-    } else {
-      alert('존재하지 않는 선거 코드입니다.');
-      return false;
-    }
-  };
-
-  // 메인 화면
-  const MainView = () => (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="max-w-4xl mx-auto">
-        <div className="text-center mb-8">
-          <Crown className="w-20 h-20 text-yellow-500 mx-auto mb-4" />
-          <h1 className="text-4xl font-bold text-gray-800 mb-2">온라인 선거 시스템</h1>
-          <p className="text-gray-600">투표 코드별 독립적인 선거방에서 안전하게 투표하세요</p>
-        </div>
-
-        {/* 빠른 접속 안내 */}
-        <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl p-6 mb-8">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold mb-2">🚀 새로운 빠른 접속 방식!</h2>
-            <p className="text-purple-100 mb-4">
-              URL 링크 없이도 선거 코드만으로 바로 투표할 수 있습니다
-            </p>
-            <div className="bg-white bg-opacity-20 rounded-lg p-4">
-              <p className="text-sm">
-                💡 <strong>학생 안내법:</strong> 선거 코드를 알려주고 <br />
-                "선거방 입장하기"에서 코드를 입력하도록 안내하세요
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          {/* 새 선거방 만들기 */}
-          <div className="bg-white rounded-2xl shadow-xl p-8">
-            <div className="text-center mb-6">
-              <Plus className="w-12 h-12 text-blue-600 mx-auto mb-3" />
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">새 선거방 만들기</h2>
-              <p className="text-gray-600">교사/관리자용</p>
-            </div>
-            
-            <button
-              onClick={createElectionRoom}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-6 rounded-xl flex items-center justify-center gap-3 transition-colors"
-            >
-              <Settings className="w-5 h-5" />
-              선거방 생성하기
-            </button>
-          </div>
-
-          {/* 선거방 입장하기 */}
-          <div className="bg-white rounded-2xl shadow-xl p-8">
-            <div className="text-center mb-6">
-              <LogIn className="w-12 h-12 text-green-600 mx-auto mb-3" />
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">선거방 입장하기</h2>
-              <p className="text-gray-600">학생/투표자용 - 선거 코드로 즉시 입장</p>
-            </div>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  선거 코드 (6자리)
-                </label>
-                <input
-                  type="text"
-                  value={joinCode}
-                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                  className="w-full border border-gray-300 rounded-lg p-4 text-2xl font-mono text-center tracking-widest uppercase"
-                  placeholder="ABC123"
-                  maxLength="6"
-                />
-                {joinCode.length === 6 && electionRooms[joinCode] && (
-                  <div className="mt-2 text-center">
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-green-100 text-green-800">
-                      ✅ 유효한 선거방입니다!
-                    </span>
-                  </div>
-                )}
-                {joinCode.length === 6 && !electionRooms[joinCode] && (
-                  <div className="mt-2 text-center">
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-red-100 text-red-800">
-                      ❌ 존재하지 않는 선거방입니다
-                    </span>
-                  </div>
-                )}
-              </div>
-              
-              <button
-                onClick={() => {
-                  if (joinCode.length === 6) {
-                    joinElectionRoom(joinCode);
-                  } else {
-                    alert('6자리 선거 코드를 입력해주세요.');
-                  }
-                }}
-                className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 px-6 rounded-xl flex items-center justify-center gap-3 transition-colors"
-                disabled={joinCode.length !== 6 || !electionRooms[joinCode]}
-              >
-                <Vote className="w-5 h-5" />
-                투표하러 가기
-              </button>
-              
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <p className="text-sm text-blue-700 text-center">
-                  💡 <strong>팁:</strong> 코드를 입력하면 실시간으로 선거방 존재 여부를 확인할 수 있습니다
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 활성화된 선거방 목록 */}
-        {Object.keys(electionRooms).length > 0 && (
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h3 className="text-xl font-semibold mb-4">활성화된 선거방</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {Object.entries(electionRooms).map(([code, room]) => (
-                <div key={code} className="border rounded-lg p-4 hover:bg-gray-50">
-                  <div className="flex justify-between items-start mb-2">
-                    <h4 className="font-bold text-lg font-mono">{code}</h4>
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      room.electionStarted ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'
-                    }`}>
-                      {room.electionStarted ? '진행중' : '대기중'}
-                    </span>
-                  </div>
-                  
-                  <div className="text-sm text-gray-600 mb-3">
-                    <p>학생: {room.students.length}명</p>
-                    <p>후보: {room.candidates.president.length + room.candidates.vicePresident.length}명</p>
-                    <p>투표: {room.votes.length}표</p>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <button
-                      onClick={() => {
-                        setCurrentRoomCode(code);
-                        setCurrentView('room');
-                      }}
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-1 px-3 rounded text-sm"
-                    >
-                      관리하기
-                    </button>
-                    
-                    <button
-                      onClick={() => copyQuickAccessText(code)}
-                      className="w-full bg-green-600 hover:bg-green-700 text-white py-1 px-3 rounded text-sm"
-                    >
-                      📋 학생 안내문 복사
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
-  // 선거방 관리 화면
-  const RoomManagementView = () => {
-    const room = electionRooms[currentRoomCode];
-    if (!room) return <div>선거방을 찾을 수 없습니다.</div>;
-
-    // 템플릿 다운로드
-    const downloadTemplate = () => {
-      try {
-        const templateData = [
-          { '번호': 1, '이름': '홍길동' },
-          { '번호': 2, '이름': '김영희' },
-          { '번호': 3, '이름': '이철수' },
-          { '번호': 4, '이름': '박민수' },
-          { '번호': 5, '이름': '최은지' }
-        ];
-
-        const workbook = XLSX.utils.book_new();
-        const worksheet = XLSX.utils.json_to_sheet(templateData);
-        worksheet['!cols'] = [{ width: 10 }, { width: 15 }];
-        XLSX.utils.book_append_sheet(workbook, worksheet, '학생명단');
-        XLSX.writeFile(workbook, `학생명단_템플릿_${currentRoomCode}.xlsx`);
-      } catch (error) {
-        alert('템플릿 다운로드 중 오류가 발생했습니다.');
-      }
-    };
-
-    // 엑셀 파일 업로드
-    const handleFileUpload = (event) => {
-      const file = event.target.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const data = new Uint8Array(e.target.result);
-          const workbook = XLSX.read(data, { type: 'array' });
-          const sheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[sheetName];
-          const jsonData = XLSX.utils.sheet_to_json(worksheet);
-          
-          const studentList = jsonData.map((row, index) => ({
-            id: index + 1,
-            number: row['번호'] || row['학번'] || row['Number'] || (index + 1),
-            name: row['이름'] || row['성명'] || row['Name'] || '',
-          })).filter(student => student.name);
-
-          setElectionRooms(prev => ({
-            ...prev,
-            [currentRoomCode]: {
-              ...prev[currentRoomCode],
-              students: studentList
-            }
-          }));
-
-          alert(`${studentList.length}명의 학생 명단이 업로드되었습니다.`);
-        } catch (error) {
-          alert('파일 읽기 오류: ' + error.message);
-        }
-      };
-      reader.readAsArrayBuffer(file);
-    };
-
-    // 후보자 추가
-    const addCandidate = (position, studentId) => {
-      const student = room.students.find(s => s.id === parseInt(studentId));
-      if (!student) return;
-
-      setElectionRooms(prev => ({
-        ...prev,
-        [currentRoomCode]: {
-          ...prev[currentRoomCode],
-          candidates: {
-            ...prev[currentRoomCode].candidates,
-            [position]: [...prev[currentRoomCode].candidates[position], { ...student, votes: 0 }]
-          }
-        }
-      }));
-    };
-
-    // 후보자 제거
-    const removeCandidate = (position, candidateId) => {
-      setElectionRooms(prev => ({
-        ...prev,
-        [currentRoomCode]: {
-          ...prev[currentRoomCode],
-          candidates: {
-            ...prev[currentRoomCode].candidates,
-            [position]: prev[currentRoomCode].candidates[position].filter(c => c.id !== candidateId)
-          }
-        }
-      }));
-    };
-
-    // 선거 시작/종료
-    const toggleElection = () => {
-      setElectionRooms(prev => ({
-        ...prev,
-        [currentRoomCode]: {
-          ...prev[currentRoomCode],
-          electionStarted: !prev[currentRoomCode].electionStarted
-        }
-      }));
-    };
-
-    return (
-      <div className="min-h-screen bg-gray-50 p-4">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-800">선거방 관리</h1>
-              <p className="text-gray-600">선거 코드: <span className="font-mono font-bold">{currentRoomCode}</span></p>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => copyQuickAccessText(currentRoomCode)}
-                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
-              >
-                <Link className="w-4 h-4" />
-                📋 학생 안내문 복사
-              </button>
-              <button
-                onClick={() => setCurrentView('main')}
-                className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg"
-              >
-                뒤로가기
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* 학생 명단 관리 */}
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                <Users className="w-5 h-5" />
-                학생 명단 관리
-              </h2>
-              
-              <div className="mb-4">
-                <div className="flex justify-between items-center mb-2">
-                  <label className="block text-sm font-medium text-gray-700">
-                    엑셀 파일 업로드
-                  </label>
-                  <button
-                    onClick={downloadTemplate}
-                    className="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-2 rounded-lg flex items-center gap-2"
-                  >
-                    <FileUp className="w-4 h-4" />
-                    템플릿
-                  </button>
-                </div>
-                <input
-                  type="file"
-                  accept=".xlsx,.xls"
-                  onChange={handleFileUpload}
-                  className="w-full border border-gray-300 rounded-lg p-2"
-                />
-              </div>
-
-              <div className="max-h-40 overflow-y-auto">
-                <p className="text-sm text-gray-600 mb-2">등록된 학생: {room.students.length}명</p>
-                {room.students.map(student => (
-                  <div key={student.id} className="flex justify-between items-center py-1 text-sm">
-                    <span>{student.number}번 {student.name}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* 투표 정보 */}
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                <Vote className="w-5 h-5" />
-                투표 정보
-              </h2>
-              
-              <div className="space-y-4">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <h3 className="font-medium text-blue-800 mb-2">📤 학생 접속 방법</h3>
-                  <div className="text-sm text-blue-700 space-y-1">
-                    <p>1. 학생 안내문 복사하여 공유 또는</p>
-                    <p>2. 선거 코드 <strong>{currentRoomCode}</strong> 직접 알려주기</p>
-                    <p>3. 학생이 메인 화면에서 코드 입력하여 입장</p>
-                  </div>
-                  
-                  <button
-                    onClick={() => copyQuickAccessText(currentRoomCode)}
-                    className="w-full mt-3 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg text-sm"
-                  >
-                    📋 학생 안내문 복사하기
-                  </button>
-                </div>
-
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <h3 className="font-medium mb-2">📊 현재 상태</h3>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <span className="text-gray-600">상태:</span>
-                      <span className={`ml-1 font-semibold ${
-                        room.electionStarted ? 'text-green-600' : 'text-orange-600'
-                      }`}>
-                        {room.electionStarted ? '진행중' : '대기중'}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">투표:</span>
-                      <span className="ml-1 font-semibold">{room.votes.length}표</span>
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  onClick={toggleElection}
-                  className={`w-full py-3 px-4 rounded-lg font-semibold ${
-                    room.electionStarted 
-                      ? 'bg-red-600 hover:bg-red-700 text-white' 
-                      : 'bg-green-600 hover:bg-green-700 text-white'
-                  }`}
-                  disabled={room.candidates.president.length === 0 || room.candidates.vicePresident.length === 0}
-                >
-                  {room.electionStarted ? '선거 종료' : '선거 시작'}
-                </button>
-              </div>
-            </div>
-
-            {/* 후보자 관리 */}
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <h2 className="text-xl font-semibold mb-4">후보자 관리</h2>
-              
-              {/* 회장 후보 */}
-              <div className="mb-6">
-                <h3 className="font-medium mb-2 text-blue-600">회장 후보</h3>
-                <div className="flex gap-2 mb-2">
-                  <select
-                    id="presidentSelect"
-                    className="flex-1 border border-gray-300 rounded-lg p-2 text-sm"
-                  >
-                    <option value="">학생 선택</option>
-                    {room.students.map(student => (
-                      <option key={student.id} value={student.id}>
-                        {student.number}번 {student.name}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={() => {
-                      const select = document.getElementById('presidentSelect');
-                      if (select && select.value) {
-                        addCandidate('president', select.value);
-                        select.value = '';
-                      }
-                    }}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm"
-                  >
-                    추가
-                  </button>
-                </div>
-                <div className="space-y-1">
-                  {room.candidates.president.map(candidate => (
-                    <div key={candidate.id} className="flex justify-between items-center bg-blue-50 p-2 rounded">
-                      <span className="text-sm">{candidate.number}번 {candidate.name}</span>
-                      <button
-                        onClick={() => removeCandidate('president', candidate.id)}
-                        className="text-red-600 hover:text-red-800 text-xs"
-                      >
-                        제거
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* 부회장 후보 */}
-              <div>
-                <h3 className="font-medium mb-2 text-green-600">부회장 후보</h3>
-                <div className="flex gap-2 mb-2">
-                  <select
-                    id="vicePresidentSelect"
-                    className="flex-1 border border-gray-300 rounded-lg p-2 text-sm"
-                  >
-                    <option value="">학생 선택</option>
-                    {room.students.map(student => (
-                      <option key={student.id} value={student.id}>
-                        {student.number}번 {student.name}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={() => {
-                      const select = document.getElementById('vicePresidentSelect');
-                      if (select && select.value) {
-                        addCandidate('vicePresident', select.value);
-                        select.value = '';
-                      }
-                    }}
-                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-sm"
-                  >
-                    추가
-                  </button>
-                </div>
-                <div className="space-y-1">
-                  {room.candidates.vicePresident.map(candidate => (
-                    <div key={candidate.id} className="flex justify-between items-center bg-green-50 p-2 rounded">
-                      <span className="text-sm">{candidate.number}번 {candidate.name}</span>
-                      <button
-                        onClick={() => removeCandidate('vicePresident', candidate.id)}
-                        className="text-red-600 hover:text-red-800 text-xs"
-                      >
-                        제거
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 실시간 투표 현황 */}
-          <div className="bg-white rounded-xl shadow-lg p-6 mt-6">
-            <h2 className="text-xl font-semibold mb-4">실시간 투표 현황</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h3 className="font-medium mb-2 text-blue-600">회장 득표 현황</h3>
-                {room.candidates.president.map(candidate => (
-                  <div key={candidate.id} className="flex justify-between items-center bg-blue-50 p-3 rounded mb-2">
-                    <span>{candidate.number}번 {candidate.name}</span>
-                    <span className="font-bold text-blue-600">{candidate.votes}표</span>
-                  </div>
-                ))}
-              </div>
-              <div>
-                <h3 className="font-medium mb-2 text-green-600">부회장 득표 현황</h3>
-                {room.candidates.vicePresident.map(candidate => (
-                  <div key={candidate.id} className="flex justify-between items-center bg-green-50 p-3 rounded mb-2">
-                    <span>{candidate.number}번 {candidate.name}</span>
-                    <span className="font-bold text-green-600">{candidate.votes}표</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <p className="text-center mt-4 text-gray-600">
-              총 투표자: {room.votedStudents.size}명 / {room.students.length}명
-            </p>
-          </div>
-
-          {/* 투표 결과 버튼 */}
-          <div className="mt-6 text-center">
-            <button
-              onClick={() => setCurrentView('results')}
-              className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-8 rounded-xl flex items-center gap-3 mx-auto"
-            >
-              <BarChart3 className="w-5 h-5" />
-              투표 결과 보기
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // 투표 화면
-  const VoteView = () => {
-    const [inputCode, setInputCode] = useState(joinCode);
-    const [currentRoom, setCurrentRoom] = useState(null);
-    const [studentNumber, setStudentNumber] = useState('');
-    const [studentName, setStudentName] = useState('');
-    const [selectedPresident, setSelectedPresident] = useState('');
-    const [selectedVicePresident, setSelectedVicePresident] = useState('');
-    const [isCodeVerified, setIsCodeVerified] = useState(false);
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
-
-    // 자동으로 코드 검증 (joinCode가 있을 때)
-    useEffect(() => {
-      if (inputCode && electionRooms[inputCode] && !isCodeVerified) {
-        setCurrentRoom(electionRooms[inputCode]);
-        setIsCodeVerified(true);
-      }
-    }, [inputCode, electionRooms, isCodeVerified]);
-
-    // 코드 검증
-    const verifyCode = () => {
-      if (electionRooms[inputCode]) {
-        setCurrentRoom(electionRooms[inputCode]);
-        setIsCodeVerified(true);
-      } else {
-        alert('존재하지 않는 선거 코드입니다.');
-      }
-    };
-
-    // 학생 인증
-    const authenticateStudent = () => {
-      if (!currentRoom) return;
-
-      const student = currentRoom.students.find(s => 
-        s.number.toString() === studentNumber.toString() && 
-        s.name === studentName
-      );
-      
-      if (!student) {
-        alert('학생 정보가 일치하지 않습니다.');
-        return;
-      }
-
-      if (currentRoom.votedStudents.has(student.id)) {
-        alert('이미 투표하셨습니다.');
-        return;
-      }
-
-      setIsAuthenticated(true);
-    };
-
-    // 투표 제출
-    const submitVote = () => {
-      if (!selectedPresident || !selectedVicePresident) {
-        alert('회장과 부회장을 모두 선택해주세요.');
-        return;
-      }
-
-      const student = currentRoom.students.find(s => 
-        s.number.toString() === studentNumber.toString() && 
-        s.name === studentName
-      );
-
-      // 선거방 데이터 업데이트
-      setElectionRooms(prev => {
-        const updatedRoom = { ...prev[inputCode] };
-        
-        // 투표 기록 추가
-        updatedRoom.votes = [...updatedRoom.votes, {
-          studentId: student.id,
-          studentName: student.name,
-          presidentId: parseInt(selectedPresident),
-          vicePresidentId: parseInt(selectedVicePresident),
-          timestamp: new Date().toISOString()
-        }];
-
-        // 투표한 학생 추가
-        updatedRoom.votedStudents = new Set([...updatedRoom.votedStudents, student.id]);
-
-        // 후보자 득표수 업데이트
-        updatedRoom.candidates.president = updatedRoom.candidates.president.map(c => 
-          c.id === parseInt(selectedPresident) ? { ...c, votes: c.votes + 1 } : c
-        );
-        updatedRoom.candidates.vicePresident = updatedRoom.candidates.vicePresident.map(c => 
-          c.id === parseInt(selectedVicePresident) ? { ...c, votes: c.votes + 1 } : c
-        );
-
-        return {
-          ...prev,
-          [inputCode]: updatedRoom
-        };
-      });
-
-      alert('투표가 완료되었습니다!');
-      setCurrentView('main');
-    };
-
-    if (!isCodeVerified) {
-      return (
-        <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-100 p-4">
-          <div className="max-w-md mx-auto">
-            <div className="flex justify-between items-center mb-6">
-              <h1 className="text-3xl font-bold text-gray-800">선거방 입장</h1>
-              <button
-                onClick={() => setCurrentView('main')}
-                className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg"
-              >
-                <Home className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-lg p-8">
-              <div className="text-center mb-6">
-                <LogIn className="w-16 h-16 text-blue-600 mx-auto mb-4" />
-                <h2 className="text-xl font-semibold mb-2">선거 코드를 입력하세요</h2>
-                <p className="text-gray-600">교사가 알려준 6자리 코드로 선거방에 입장할 수 있습니다</p>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    선거 코드 (6자리)
-                  </label>
-                  <input
-                    type="text"
-                    value={inputCode}
-                    onChange={(e) => setInputCode(e.target.value.toUpperCase())}
-                    className="w-full border border-gray-300 rounded-lg p-4 text-2xl font-mono text-center tracking-widest uppercase"
-                    placeholder="ABC123"
-                    maxLength="6"
-                  />
-                  
-                  {inputCode.length === 6 && (
-                    <div className="mt-2 text-center">
-                      {electionRooms[inputCode] ? (
-                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-green-100 text-green-800">
-                          ✅ 유효한 선거방입니다!
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-red-100 text-red-800">
-                          ❌ 존재하지 않는 선거방입니다
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-                
-                <button
-                  onClick={verifyCode}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg"
-                  disabled={inputCode.length !== 6 || !electionRooms[inputCode]}
-                >
-                  선거방 입장하기
-                </button>
-                
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="text-sm text-blue-700 text-center">
-                    💡 <strong>도움말:</strong> 선거 코드는 교사가 알려준 6자리 영문/숫자 조합입니다
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    if (!currentRoom.electionStarted) {
-      return (
-        <div className="min-h-screen bg-gradient-to-br from-orange-50 to-yellow-100 p-4">
-          <div className="max-w-md mx-auto">
-            <div className="bg-white rounded-xl shadow-lg p-8 text-center">
-              <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Vote className="w-10 h-10 text-orange-500" />
-              </div>
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">투표 대기 중</h2>
-              <p className="text-gray-600 mb-2">선거방 <span className="font-mono font-bold text-blue-600">{inputCode}</span>에 입장했습니다</p>
-              <p className="text-gray-600 mb-6">교사가 투표를 시작할 때까지 기다려주세요</p>
-              
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                <h3 className="font-semibold text-blue-800 mb-2">📊 선거방 정보</h3>
-                <div className="text-sm text-blue-700 space-y-1">
-                  <p>등록된 학생: {currentRoom.students.length}명</p>
-                  <p>회장 후보: {currentRoom.candidates.president.length}명</p>
-                  <p>부회장 후보: {currentRoom.candidates.vicePresident.length}명</p>
-                </div>
-              </div>
-
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-                <h3 className="font-semibold text-yellow-800 mb-2">⏳ 대기 중 할 수 있는 것</h3>
-                <div className="text-sm text-yellow-700 space-y-1">
-                  <p>• 이 페이지를 그대로 두고 기다리세요</p>
-                  <p>• 새로고침하면 투표 시작 여부를 확인할 수 있습니다</p>
-                  <p>• 투표가 시작되면 자동으로 알림이 표시됩니다</p>
-                </div>
-              </div>
-
-              <div className="flex gap-3 justify-center">
-                <button
-                  onClick={() => window.location.reload()}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm"
-                >
-                  🔄 상태 확인
-                </button>
-                <button
-                  onClick={() => setCurrentView('main')}
-                  className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm"
-                >
-                  나가기
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    if (!isAuthenticated) {
-      return (
-        <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-100 p-4">
-          <div className="max-w-md mx-auto">
-            <div className="flex justify-between items-center mb-6">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-800">본인 인증</h1>
-                <p className="text-sm text-gray-600">선거방: {inputCode}</p>
-              </div>
-              <button
-                onClick={() => setCurrentView('main')}
-                className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg"
-              >
-                나가기
-              </button>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-lg p-8">
-              <div className="text-center mb-6">
-                <UserCheck className="w-16 h-16 text-green-600 mx-auto mb-4" />
-                <h2 className="text-xl font-semibold mb-2">학생 정보를 입력하세요</h2>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">학생 번호</label>
-                  <input
-                    type="text"
-                    value={studentNumber}
-                    onChange={(e) => setStudentNumber(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg p-3"
-                    placeholder="학생 번호를 입력하세요"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">이름</label>
-                  <input
-                    type="text"
-                    value={studentName}
-                    onChange={(e) => setStudentName(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg p-3"
-                    placeholder="이름을 입력하세요"
-                  />
-                </div>
-                
-                <button
-                  onClick={authenticateStudent}
-                  className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg"
-                >
-                  인증하기
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-100 p-4">
-        <div className="max-w-2xl mx-auto">
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-800">투표하기</h1>
-              <p className="text-sm text-gray-600">선거방: {inputCode} | {studentName}님</p>
-            </div>
-            <button
-              onClick={() => setCurrentView('main')}
-              className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg"
-            >
-              나가기
-            </button>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-lg p-8">
-            <div className="space-y-6">
-              {/* 회장 선택 */}
-              <div>
-                <h3 className="text-lg font-medium mb-3 text-blue-600">회장 후보</h3>
-                <div className="space-y-2">
-                  {currentRoom.candidates.president.map(candidate => (
-                    <label key={candidate.id} className="flex items-center p-3 border rounded-lg hover:bg-blue-50 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="president"
-                        value={candidate.id}
-                        onChange={(e) => setSelectedPresident(e.target.value)}
-                        className="mr-3"
-                      />
-                      <span>{candidate.number}번 {candidate.name}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* 부회장 선택 */}
-              <div>
-                <h3 className="text-lg font-medium mb-3 text-green-600">부회장 후보</h3>
-                <div className="space-y-2">
-                  {currentRoom.candidates.vicePresident.map(candidate => (
-                    <label key={candidate.id} className="flex items-center p-3 border rounded-lg hover:bg-green-50 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="vicePresident"
-                        value={candidate.id}
-                        onChange={(e) => setSelectedVicePresident(e.target.value)}
-                        className="mr-3"
-                      />
-                      <span>{candidate.number}번 {candidate.name}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <button
-                onClick={submitVote}
-                className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-4 px-4 rounded-lg"
-              >
-                투표하기
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // 결과 화면
-  const ResultsView = () => {
-    const room = electionRooms[currentRoomCode];
-    if (!room) return <div>선거방을 찾을 수 없습니다.</div>;
-
-    const presidentWinner = room.candidates.president.length > 0 
-      ? room.candidates.president.reduce((max, candidate) => 
-          candidate.votes > max.votes ? candidate : max, { votes: 0 }
-        )
-      : { votes: 0, name: '후보 없음', number: '' };
-    
-    const vicePresidentWinner = room.candidates.vicePresident.length > 0
-      ? room.candidates.vicePresident.reduce((max, candidate) => 
-          candidate.votes > max.votes ? candidate : max, { votes: 0 }
-        )
-      : { votes: 0, name: '후보 없음', number: '' };
-
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-100 p-4">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-800">투표 결과</h1>
-              <p className="text-gray-600">선거방: <span className="font-mono font-bold">{currentRoomCode}</span></p>
-            </div>
-            <button
-              onClick={() => setCurrentView('room')}
-              className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg"
-            >
-              관리로 돌아가기
-            </button>
-          </div>
-
-          {/* 당선자 발표 */}
-          {room.votes.length > 0 && (
-            <div className="bg-white rounded-xl shadow-lg p-8 mb-6">
-              <h2 className="text-2xl font-bold text-center mb-6 flex items-center justify-center gap-2">
-                <Trophy className="w-6 h-6 text-yellow-500" />
-                당선자 발표
-              </h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="text-center p-6 bg-blue-50 rounded-xl">
-                  <Crown className="w-12 h-12 text-blue-600 mx-auto mb-3" />
-                  <h3 className="text-lg font-semibold text-blue-600 mb-2">회장</h3>
-                  <p className="text-2xl font-bold">{presidentWinner.name || '후보 없음'}</p>
-                  <p className="text-gray-600">{presidentWinner.number}번</p>
-                  <p className="text-blue-600 font-semibold mt-2">{presidentWinner.votes}표</p>
-                </div>
-                
-                <div className="text-center p-6 bg-green-50 rounded-xl">
-                  <Crown className="w-12 h-12 text-green-600 mx-auto mb-3" />
-                  <h3 className="text-lg font-semibold text-green-600 mb-2">부회장</h3>
-                  <p className="text-2xl font-bold">{vicePresidentWinner.name || '후보 없음'}</p>
-                  <p className="text-gray-600">{vicePresidentWinner.number}번</p>
-                  <p className="text-green-600 font-semibold mt-2">{vicePresidentWinner.votes}표</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 상세 결과 */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <h3 className="text-xl font-semibold mb-4 text-blue-600">회장 득표 결과</h3>
-              <div className="space-y-3">
-                {room.candidates.president
-                  .sort((a, b) => b.votes - a.votes)
-                  .map((candidate, index) => (
-                    <div key={candidate.id} className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <span className="text-lg font-bold text-blue-600">#{index + 1}</span>
-                        <span>{candidate.number}번 {candidate.name}</span>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-xl font-bold text-blue-600">{candidate.votes}</span>
-                        <span className="text-sm text-gray-600 ml-1">표</span>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <h3 className="text-xl font-semibold mb-4 text-green-600">부회장 득표 결과</h3>
-              <div className="space-y-3">
-                {room.candidates.vicePresident
-                  .sort((a, b) => b.votes - a.votes)
-                  .map((candidate, index) => (
-                    <div key={candidate.id} className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <span className="text-lg font-bold text-green-600">#{index + 1}</span>
-                        <span>{candidate.number}번 {candidate.name}</span>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-xl font-bold text-green-600">{candidate.votes}</span>
-                        <span className="text-sm text-gray-600 ml-1">표</span>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          </div>
-
-          {/* 투표 통계 */}
-          <div className="bg-white rounded-xl shadow-lg p-6 mt-6">
-            <h3 className="text-xl font-semibold mb-4">투표 통계</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <p className="text-2xl font-bold text-purple-600">{room.students.length}</p>
-                <p className="text-sm text-gray-600">전체 학생</p>
-              </div>
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <p className="text-2xl font-bold text-blue-600">{room.votedStudents.size}</p>
-                <p className="text-sm text-gray-600">투표 참여</p>
-              </div>
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <p className="text-2xl font-bold text-green-600">
-                  {room.students.length > 0 ? Math.round((room.votedStudents.size / room.students.length) * 100) : 0}%
-                </p>
-                <p className="text-sm text-gray-600">투표율</p>
-              </div>
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <p className="text-2xl font-bold text-orange-600">{room.students.length - room.votedStudents.size}</p>
-                <p className="text-sm text-gray-600">미투표</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // 메인 렌더링
-  return (
-    <div>
-      {currentView === 'main' && <MainView />}
-      {currentView === 'room' && <RoomManagementView />}
-      {currentView === 'vote' && <VoteView />}
-      {currentView === 'results' && <ResultsView />}
-    </div>
-  );
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101a35"><meta name="description" content="PDF 기출문제를 직접 선택하고 나만의 수능 분석 노트를 만드는 앱">
+<link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="icon-192.png">
+<title>문항랩 | 수능 기출 분석 노트</title>
+<style>
+:root{--ink:#17213b;--navy:#101a35;--blue:#5267f5;--cyan:#29c5c2;--line:#e4e8f2;--muted:#74809a;--bg:#f4f6fc;--card:#fff;--shadow:0 12px 34px rgba(27,39,78,.08)}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(circle at 90% 0%,#e7eaff 0,transparent 28%),var(--bg);color:var(--ink);font-family:Inter,"Pretendard","Malgun Gothic","맑은 고딕",Arial,sans-serif}
+header{background:linear-gradient(120deg,#101a35 0%,#202e59 65%,#3448a3 100%);color:#fff;padding:25px max(18px,calc((100% - 1120px)/2));position:relative;overflow:hidden}header:after{content:"";position:absolute;width:260px;height:260px;border:1px solid #ffffff20;border-radius:50%;right:8%;top:-155px;box-shadow:0 0 0 28px #ffffff08,0 0 0 58px #ffffff06}header h1{font-size:clamp(22px,3vw,30px);margin:0 0 7px;letter-spacing:-.8px}header p{margin:0;color:#cbd5f5;font-size:13px}header .brandline{display:flex;align-items:center;gap:11px;position:relative;z-index:1}header .brandmark{width:42px;height:42px;border-radius:14px;background:linear-gradient(145deg,#7584ff,#35d2c4);display:grid;place-items:center;box-shadow:0 7px 18px #0003}header .brandmark svg{width:26px;height:26px}
+main{max-width:1120px;margin:24px auto;padding:0 18px 54px}.panel{background:var(--card);border:1px solid #e8ebf4;border-radius:18px;padding:21px;margin-bottom:16px;box-shadow:var(--shadow)}h2{font-size:16px;margin:0 0 14px;letter-spacing:-.3px}.step{display:inline-grid;place-items:center;width:25px;height:25px;border-radius:9px;background:#eef0ff;color:#4c5de0;font-size:12px;font-weight:800;margin-right:8px}.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}input[type=file]{max-width:100%;font-size:13px}input[type=text],input[type=number],select{border:1px solid var(--line);border-radius:10px;padding:11px 12px;background:#fbfcff;color:var(--ink);outline:none}input:focus{border-color:#8794ff;box-shadow:0 0 0 3px #5367f51a}input[type=text]{min-width:220px;flex:1}button,.linkbtn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:0;border-radius:11px;padding:11px 15px;background:linear-gradient(135deg,#596cf5,#4658dc);color:white;font-weight:750;text-decoration:none;cursor:pointer;font-size:13px;box-shadow:0 5px 12px #5267f526;transition:transform .15s,filter .15s}button:hover,.linkbtn:hover{filter:brightness(1.04);transform:translateY(-1px)}button.secondary,.linkbtn.secondary{background:#eef1f8;color:#35415d;box-shadow:none}button:disabled{opacity:.42;cursor:not-allowed;transform:none}.small{font-size:12px;line-height:1.7;color:var(--muted)}.status{font-size:13px;color:#4c5de0;white-space:pre-wrap;margin-top:12px;padding:10px 12px;background:#f4f5ff;border-radius:10px}.pill{font-size:11px;background:#edf0ff;color:#4b5dd8;border-radius:30px;padding:5px 10px;font-weight:700}.list{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:8px;max-height:230px;overflow:auto;margin-top:12px}.item{border:1px solid var(--line);border-radius:10px;padding:8px;font-size:12px;display:flex;gap:7px;align-items:center}.item input{accent-color:var(--blue)}.progress{height:6px;background:#e8edf3;border-radius:8px;overflow:hidden;margin-top:12px}.progress span{display:block;height:100%;width:0;background:#3475d1}
+#previewWrap{display:none}.previewTools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.previewPage{width:100%;aspect-ratio:210/297;background:white;border:1px solid #d9deea;box-shadow:0 3px 12px #1d29381a;margin:0 auto 18px;padding:2.7%;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto 1fr 2fr;column-gap:2%;row-gap:7px;overflow:hidden;page-break-after:always}.previewProblem{grid-column:1;grid-row:2;height:100%;border:1px solid #cbd3de;border-radius:5px;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:5px}.previewProblem img{width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;display:block;margin:auto}.previewAnalysis{grid-column:1;grid-row:3;min-height:0;border:1px solid #cbd3de;border-radius:5px;padding:6px;display:grid;grid-template-columns:1fr;grid-template-rows:1fr 1fr;gap:8px}.analysisCell{min-height:0;display:flex;flex-direction:column;gap:3px}.analysisTitle{font-weight:700;font-size:clamp(7px,.95vw,11px);color:#263950}.analysisLines{flex:1;min-height:0;border:1px solid #e0e5ec;border-radius:3px;background:repeating-linear-gradient(to bottom,white 0,white 29px,#dfe5ed 30px)}.previewRight{grid-column:2;grid-row:2 / 4;border:1px solid #cbd3de;border-radius:5px;padding:8px;display:flex;flex-direction:column;min-height:0}.solveTitle{font-weight:700;font-size:clamp(10px,1.3vw,14px);border-bottom:1px solid #dfe5ed;padding-bottom:6px}.solveLines{flex:1;margin-top:8px;background:repeating-linear-gradient(to bottom,white 0,white 29px,#dfe5ed 30px);border-bottom:1px solid #e4e9ef}.pageHead{grid-column:1/-1;grid-row:1;display:flex;justify-content:space-between;font-size:clamp(8px,1vw,11px);color:#566579;border-bottom:1px solid #aeb9c8;padding-bottom:5px}
+.answerSourcePage{width:100%;aspect-ratio:210/297;background:#fff;border:1px solid #d9deea;box-shadow:0 3px 12px #1d29381a;margin:0 auto 18px;padding:0;display:flex;align-items:center;justify-content:center;overflow:hidden;page-break-after:always;break-after:page}.answerSourcePage img{display:block;width:100%;height:100%;object-fit:contain}
+#manualWorkspace{display:none}#pageStage{position:relative;width:100%;max-height:72vh;overflow:auto;border:1px solid #dfe4ef;background:#edf0f7;border-radius:13px;padding:10px;text-align:center}#canvasWrap{position:relative;width:max-content;max-width:100%;margin:0 auto;line-height:0}#pageCanvas{display:block;width:100%;max-width:100%;height:auto;background:white;box-shadow:0 2px 8px #0002;touch-action:none;cursor:crosshair}#selectionLayer{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:hidden}#selectionRect{position:absolute;border:3px solid #e03131;background:rgba(224,49,49,.18);box-shadow:0 0 0 9999px rgba(20,35,55,.12);display:none;box-sizing:border-box}.selectionHint{font-size:12px;color:var(--muted);margin:8px 0}.previewTools strong{margin-right:auto}footer{text-align:center;color:#8b94a8;font-size:11px;margin:18px}
+@media(max-width:700px){header{padding:20px 17px}main{margin:14px auto;padding:0 12px 35px}.panel{padding:16px;border-radius:15px;margin-bottom:12px}h2{font-size:15px}.row>*{max-width:100%}input[type=text]{min-width:100%;flex-basis:100%}#pageStage{max-height:62vh;padding:6px}#pageCanvas{width:100%;height:auto}.previewPage{min-width:0;width:100%;padding:2%;column-gap:1.5%;row-gap:5px;grid-template-rows:auto 1fr 2fr}.previewAnalysis{gap:6px;padding:4px}.previewRight{padding:5px}.analysisTitle{font-size:7px}.solveTitle{font-size:9px}.previewTools{gap:6px}.previewTools button{padding:9px 10px;font-size:12px}.list{grid-template-columns:1fr 1fr}.selectionHint{font-size:11px}}
+@media(max-width:390px){.list{grid-template-columns:1fr}.previewPage{font-size:8px}}
+@page{size:A4 portrait;margin:0}
+@media print{body{background:white}header,main>.panel,footer,.previewTools{display:none!important}main{max-width:none;margin:0;padding:0}#previewWrap{display:block!important}.previewPage{width:210mm;height:297mm;aspect-ratio:auto;margin:0;border:0;box-shadow:none;padding:7mm 8mm;grid-template-columns:1fr 1fr;grid-template-rows:auto 1fr 2fr;column-gap:5mm;row-gap:4mm;break-after:page;page-break-after:always}.previewPage:last-child{break-after:auto;page-break-after:auto}.answerSourcePage{width:210mm;height:297mm;aspect-ratio:auto;margin:0;border:0;box-shadow:none;break-before:page;page-break-before:always;break-after:page;page-break-after:always}.answerSourcePage:last-child{break-after:auto;page-break-after:auto}.pageHead{font-size:9pt}.analysisTitle{font-size:9pt}.solveTitle{font-size:10pt}}
+</style></head>
+<body>
+<header><div class="brandline"><div class="brandmark"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4.5A2.5 2.5 0 0 1 7.5 2H20v17H7.5A2.5 2.5 0 0 0 5 21.5z"/><path d="M5 4.5v17M9 7h7M9 11h7M9 15h4"/></svg></div><div><h1>문항랩</h1><p>기출을 분석하고, 실력을 설계하다 · 수능 분석 노트 스튜디오</p></div></div></header>
+<main>
+<section class="panel">
+<h2><span class="step">01</span>기출 PDF 불러오기</h2>
+<div class="row"><input id="pdfFile" type="file" accept=".pdf,application/pdf"><input id="examTitle" type="text" placeholder="시험명 (예: 2027학년도 9월 모의평가)"></div>
+<div class="row" style="margin-top:12px"><label for="answerFile" style="font-size:13px;font-weight:750">정답 및 해설 PDF 추가</label><input id="answerFile" type="file" accept=".pdf,application/pdf"><span id="answerStatus" class="pill">선택 안 됨</span></div>
+<p class="small">정답 및 해설 PDF는 문항별로 자르지 않고 원본 페이지 그대로 분석 노트 마지막에 이어 붙입니다.</p>
+<p class="small">각 페이지를 직접 확인하고 문항 영역을 드래그해 선택합니다. 자동 문항 인식은 사용하지 않습니다. 스마트폰에서는 화면을 길게 누른 뒤 드래그해 영역을 지정할 수 있습니다.</p>
+</section>
+<section class="panel">
+<h2><span class="step">02</span>인터넷 기출문제 자료실</h2>
+<div class="row">
+<a class="linkbtn" href="https://www.ebsi.co.kr/ebs/xip/xipa/retrieveSCVPreparation.ebs?cookieGradeVal=high3&irecord=202509033&targetCd=D300" target="_blank" rel="noopener">EBSi 고3 기출문제 자료실 열기 ↗</a>
+<a class="linkbtn secondary" href="https://teacher.ebsi.co.kr/" target="_blank" rel="noopener">EBS 교사지원센터 ↗</a>
+<a class="linkbtn secondary" href="https://www.suneung.re.kr/" target="_blank" rel="noopener">수능 공식 홈페이지 ↗</a>
+</div>
+<p class="small">EBSi는 2006학년도 이후 수능·모의평가·학력평가 기출 자료를 연도·학년·과목별로 제공한다고 안내하고 있습니다. 자료실에서 PDF 또는 제공 파일을 내려받은 뒤 위의 PDF 불러오기로 가져오세요. 일부 자료는 로그인 또는 교사 인증이 필요할 수 있습니다.</p>
+</section>
+<section class="panel">
+<h2><span class="step">03</span>페이지에서 문항 영역 직접 선택</h2>
+<div class="row">
+ <button id="prevPage" class="secondary" disabled>이전 페이지</button>
+ <label class="small">페이지 <input id="pageNumber" type="number" min="1" value="1" style="width:76px"></label>
+ <span id="pageTotal" class="pill">/ 0</span>
+ <button id="nextPage" class="secondary" disabled>다음 페이지</button>
+ <button id="loadPage" class="secondary" disabled>페이지 보기</button>
+</div>
+<p class="selectionHint">PDF 페이지에서 문항 번호와 지문·그림이 포함되도록 사각형을 드래그해 선택하세요. 선택한 영역은 분석 노트 왼쪽 위 문제 칸에 배치됩니다.</p>
+<div id="manualWorkspace">
+ <div class="row" style="margin:10px 0">
+  <button id="addSelection" disabled>선택 문항 만들기</button>
+  <button id="clearSelection" class="secondary" disabled>선택 해제</button>
+  <span id="selectionInfo" class="pill">영역 미선택</span>
+ </div>
+ <div id="pageStage">
+  <div id="canvasWrap">
+   <canvas id="pageCanvas"></canvas>
+   <div id="selectionLayer"><div id="selectionRect"></div></div>
+  </div>
+ </div>
+</div>
+<div class="row" style="margin-top:12px"><span id="count" class="pill">0문항 선택</span></div>
+<div id="questionList" class="list"></div>
+<div id="status" class="status">PDF 파일을 선택하면 페이지를 직접 선택할 수 있습니다.</div>
+</section>
+<section class="panel">
+<h2><span class="step">04</span>미리보기 및 PDF 출력</h2>
+<div class="row"><button id="previewBtn" disabled>선택 문항 미리보기</button><button id="printBtn" class="secondary" disabled>PDF로 저장 / 인쇄</button></div>
+<p class="small">A4 세로형에서 왼쪽은 위쪽 문항(1/3)과 아래쪽 분석(2/3), 오른쪽은 풀이 공간으로 구성됩니다. 정답 및 해설 PDF를 추가하면 문항 노트 뒤에 원본 페이지가 이어집니다. PDF 저장 버튼을 누른 뒤 인쇄 창에서 'PDF로 저장'을 선택하세요.</p>
+</section>
+<section id="previewWrap" class="panel">
+<div class="previewTools"><strong>분석 노트 미리보기</strong><span id="previewCount" class="pill"></span><button class="secondary" id="closePreview">미리보기 닫기</button></div>
+<div id="previewPages"></div>
+</section>
+<footer>각 페이지에서 직접 지정한 영역만 문항 이미지로 사용합니다. 선택 영역에 문항 번호와 지문이 모두 들어갔는지 미리보기에서 확인하세요.</footer>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+(()=> {
+const $=id=>document.getElementById(id);
+let pdfDoc=null,answerPdfDoc=null,qs=[],sourceName='',currentPage=1,renderedPage=null;
+let dragStart=null,selection=null;
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const status=m=>$('status').textContent=m;
+$('pdfFile').addEventListener('change',async e=>{
+ const f=e.target.files[0];if(!f)return;
+ sourceName=f.name.replace(/\.pdf$/i,'');
+ if(!$('examTitle').value)$('examTitle').value=sourceName;
+ try{
+  pdfDoc=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise;
+  qs=[];currentPage=1;selection=null;renderList();
+  $('pageTotal').textContent='/ '+pdfDoc.numPages;
+  $('pageNumber').max=pdfDoc.numPages;$('pageNumber').value=1;
+  $('manualWorkspace').style.display='block';
+  $('prevPage').disabled=true;$('nextPage').disabled=pdfDoc.numPages<=1;$('loadPage').disabled=false;
+  $('previewBtn').disabled=true;$('printBtn').disabled=true;$('previewWrap').style.display='none';
+  await showPage(1);
+  status(`${pdfDoc.numPages}페이지를 불러왔습니다. 페이지에서 문항 영역을 드래그해 선택하세요.`);
+ }catch(err){status('PDF를 열 수 없습니다: '+err.message)}
+});
+$('answerFile').addEventListener('change',async e=>{
+ const f=e.target.files[0]; answerPdfDoc=null;
+ if(!f){$('answerStatus').textContent='선택 안 됨';return;}
+ try{
+  answerPdfDoc=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise;
+  $('answerStatus').textContent=`${answerPdfDoc.numPages}페이지 등록`;
+  status(`정답 및 해설 파일 ${answerPdfDoc.numPages}페이지를 등록했습니다. 노트 출력 시 문항 분석 페이지 뒤에 원본 그대로 추가됩니다.`);
+ }catch(err){answerPdfDoc=null;$('answerStatus').textContent='불러오기 실패';status('정답 및 해설 PDF를 열 수 없습니다: '+err.message);}
+});
+async function showPage(n){
+ if(!pdfDoc)return;
+ n=Math.max(1,Math.min(pdfDoc.numPages,Number(n)||1));currentPage=n;
+ $('pageNumber').value=n;$('prevPage').disabled=n<=1;$('nextPage').disabled=n>=pdfDoc.numPages;
+ const page=await pdfDoc.getPage(n),viewport=page.getViewport({scale:1.6}),canvas=$('pageCanvas');
+ canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);
+ await page.render({canvasContext:canvas.getContext('2d'),viewport}).promise;
+ renderedPage={pageNo:n,width:canvas.width,height:canvas.height};
+ clearSelection();
+}
+$('prevPage').onclick=()=>showPage(currentPage-1);
+$('nextPage').onclick=()=>showPage(currentPage+1);
+$('loadPage').onclick=()=>showPage($('pageNumber').value);
+$('pageNumber').addEventListener('keydown',e=>{if(e.key==='Enter')showPage($('pageNumber').value)});
+const canvas=$('pageCanvas'),rect=$('selectionRect');
+function pointerPosition(e){
+ const r=canvas.getBoundingClientRect();
+ return {x:Math.max(0,Math.min(r.width,e.clientX-r.left)),y:Math.max(0,Math.min(r.height,e.clientY-r.top)),w:r.width,h:r.height};
+}
+canvas.addEventListener('pointerdown',e=>{
+ const p=pointerPosition(e);dragStart=p;selection=null;
+ rect.style.display='block';rect.style.left=(p.x/p.w*100)+'%';rect.style.top=(p.y/p.h*100)+'%';rect.style.width='0';rect.style.height='0';
+ canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener('pointermove',e=>{
+ if(!dragStart)return;const p=pointerPosition(e);
+ const x=Math.min(dragStart.x,p.x),y=Math.min(dragStart.y,p.y),w=Math.abs(p.x-dragStart.x),h=Math.abs(p.y-dragStart.y);
+ rect.style.left=(x/p.w*100)+'%';rect.style.top=(y/p.h*100)+'%';rect.style.width=(w/p.w*100)+'%';rect.style.height=(h/p.h*100)+'%';
+ selection={x:x/p.w,y:y/p.h,w:w/p.w,h:h/p.h};
+ $('selectionInfo').textContent=`선택 ${Math.round(w)} × ${Math.round(h)} px`;
+ $('addSelection').disabled=w<12||h<12;$('clearSelection').disabled=false;
+});
+canvas.addEventListener('pointerup',()=>{dragStart=null;});
+function clearSelection(){
+ selection=null;dragStart=null;rect.style.display='none';$('selectionInfo').textContent='영역 미선택';$('addSelection').disabled=true;$('clearSelection').disabled=true;
+}
+$('clearSelection').onclick=clearSelection;
+$('addSelection').onclick=()=>{
+ if(!selection||!renderedPage)return;
+ const n=qs.filter(q=>q.page===currentPage).length+1;
+ qs.push({page:currentPage,num:n,selected:true,sx:selection.x,sy:selection.y,sw:selection.w,sh:selection.h});
+ clearSelection();renderList();
+ status(`${currentPage}페이지에서 ${n}번째 문항 영역을 추가했습니다. 같은 페이지에서 다음 문제를 계속 선택하거나 다른 페이지로 이동하세요.`);
 };
-
-export default ElectionRoomSystem;
+function renderList(){
+ const box=$('questionList');box.innerHTML='';
+ qs.forEach((q,i)=>{
+  const l=document.createElement('div');l.className='item';
+  const c=document.createElement('input');c.type='checkbox';c.checked=q.selected;c.onchange=()=>{q.selected=c.checked;updateCount()};
+  const t=document.createElement('span');t.textContent=`${i+1}. ${q.page}쪽 선택 ${q.num}`;
+  const del=document.createElement('button');del.className='secondary';del.textContent='삭제';del.style.padding='4px 8px';del.onclick=()=>{qs.splice(i,1);renumber();renderList()};
+  l.append(c,t,del);box.append(l);
+ });
+ updateCount();
+}
+function renumber(){const seen={};qs.forEach(q=>{seen[q.page]=(seen[q.page]||0)+1;q.num=seen[q.page]})}
+function updateCount(){
+ const n=qs.filter(q=>q.selected).length;
+ $('count').textContent=`${n} / ${qs.length}문항 선택`;
+ $('previewBtn').disabled=n===0;$('printBtn').disabled=n===0;
+}
+async function makePreview(){
+ const chosen=qs.filter(q=>q.selected);$('previewPages').innerHTML='';
+ $('previewWrap').style.display='block';$('previewCount').textContent=chosen.length+'페이지';
+ for(let i=0;i<chosen.length;i++){
+  const q=chosen[i],page=await pdfDoc.getPage(q.page),viewport=page.getViewport({scale:2}),src=document.createElement('canvas');
+  src.width=Math.ceil(viewport.width);src.height=Math.ceil(viewport.height);
+  await page.render({canvasContext:src.getContext('2d'),viewport}).promise;
+  const x=Math.max(0,Math.floor(q.sx*src.width)),y=Math.max(0,Math.floor(q.sy*src.height));
+  const w=Math.min(src.width-x,Math.ceil(q.sw*src.width)),h=Math.min(src.height-y,Math.ceil(q.sh*src.height));
+  const crop=document.createElement('canvas');crop.width=Math.max(1,w);crop.height=Math.max(1,h);
+  crop.getContext('2d').drawImage(src,x,y,w,h,0,0,w,h);
+  const pageEl=document.createElement('article');pageEl.className='previewPage';
+  const head=document.createElement('div');head.className='pageHead';
+  head.innerHTML=`<span>${escapeHtml($('examTitle').value||sourceName||'수능 기출 분석')}</span><span>${i+1} / ${chosen.length}　|　${q.page}쪽 ${q.num}번</span>`;
+  const prob=document.createElement('div');prob.className='previewProblem';
+  const img=document.createElement('img');img.src=crop.toDataURL('image/png');img.alt=`${q.num}번 문제`;prob.append(img);
+  const analysis=document.createElement('div');analysis.className='previewAnalysis';
+  analysis.innerHTML=['주요 개념','풀이 전략 및 핵심 아이디어'].map(t=>`<div class="analysisCell"><div class="analysisTitle">${t}</div><div class="analysisLines"></div></div>`).join('');
+  const right=document.createElement('div');right.className='previewRight';right.innerHTML='<div class="solveTitle">풀이 공간</div><div class="solveLines"></div>';
+  pageEl.append(head,prob,analysis,right);$('previewPages').append(pageEl);
+ }
+ // 정답 및 해설 PDF는 문항 단위로 자르지 않고 원본 페이지 전체를 노트 뒤에 추가
+ if(answerPdfDoc){
+  for(let p=1;p<=answerPdfDoc.numPages;p++){
+   const page=await answerPdfDoc.getPage(p),viewport=page.getViewport({scale:1.7});
+   const sourceCanvas=document.createElement('canvas');sourceCanvas.width=Math.ceil(viewport.width);sourceCanvas.height=Math.ceil(viewport.height);
+   await page.render({canvasContext:sourceCanvas.getContext('2d'),viewport}).promise;
+   const pageEl=document.createElement('article');pageEl.className='answerSourcePage';
+   const img=document.createElement('img');img.src=sourceCanvas.toDataURL('image/png');img.alt=`정답 및 해설 ${p}페이지`;pageEl.append(img);
+   $('previewPages').append(pageEl);
+  }
+ }
+ $('previewCount').textContent=chosen.length+'문항 노트'+(answerPdfDoc?` + 해설 ${answerPdfDoc.numPages}쪽`:'');
+ $('previewWrap').scrollIntoView({behavior:'smooth'});
+}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+$('previewBtn').onclick=makePreview;
+$('closePreview').onclick=()=>$('previewWrap').style.display='none';
+$('printBtn').onclick=()=>window.print();
+if('serviceWorker' in navigator && location.protocol.startsWith('http')){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
+})();
+</script></body></html>
